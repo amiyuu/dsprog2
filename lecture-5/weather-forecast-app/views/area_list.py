@@ -120,8 +120,19 @@ class AreaListView(ft.View):
         
         self.area_list_column.controls.clear()
         
-        #officesから地域を取得
+        # centersから有効な地域コードを取得
+        centers = self.areas_data.get('centers', {})
+        valid_codes = set()
+        for center_info in centers.values():
+            valid_codes.update(center_info.get('children', []))
+        
+        # officesから地域を取得（有効なコードのみ）
         offices = self.areas_data.get('offices',{})
+        offices = {
+            code: info 
+            for code, info in offices.items() 
+            if code in valid_codes
+        }
         
         #検索フィルターを適用
         if self.search_query:

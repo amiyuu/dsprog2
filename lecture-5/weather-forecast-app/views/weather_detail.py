@@ -114,10 +114,21 @@ class WeatherDetailView(ft.View):
         
         #地域名を取得
         area_name = "不明な地域"
+        publishing_office = ""
+        
         if self.weather_data and len(self.weather_data) > 0:
             first_forecast = self.weather_data[0]
             publishing_office = first_forecast.get('publishingOffice', '')
-            area_name = first_forecast.get('targetArea', area_name)
+            
+            # timeSeries[0]のareasから地域名を取得
+            try:
+                time_series = first_forecast.get('timeSeries', [])
+                if time_series and len(time_series) > 0:
+                    areas = time_series[0].get('areas', [])
+                    if areas and len(areas) > 0:
+                        area_name = areas[0].get('area', {}).get('name', area_name)
+            except Exception as e:
+                print(f"地域名取得エラー: {e}")
         
         # 地域名表示
         self.content_column.controls.append(
@@ -148,10 +159,37 @@ class WeatherDetailView(ft.View):
             self._safe_update()
             return
         
-        # 各予報期間の情報を表示
-        for forecast in self.weather_data[:3]:  # 最大3件表示
-            forecast_card = self._create_forecast_card(forecast)
-            self.content_column.controls.append(forecast_card)
+        # timeSeriesから天気予報データを取得
+        try:
+            first_forecast = self.weather_data[0]
+            time_series = first_forecast.get('timeSeries', [])
+            
+            if time_series and len(time_series) > 0:
+                # 最初のtimeSeriesから天気情報を取得
+                ts_data = time_series[0]
+                time_defines = ts_data.get('timeDefines', [])
+                areas = ts_data.get('areas', [])
+                
+                if areas and len(areas) > 0:
+                    area_data = areas[0]
+                    weathers = area_data.get('weathers', [])
+                    winds = area_data.get('winds', [])
+                    waves = area_data.get('waves', [])
+                    
+                    # 各時間帯の予報を表示（最大3件）
+                    for i in range(min(3, len(time_defines))):
+                        forecast_card = self._create_forecast_card(
+                            time_defines[i] if i < len(time_defines) else None,
+                            weathers[i] if i < len(weathers) else '情報なし',
+                            winds[i] if i < len(winds) else '情報なし',
+                            waves[i] if i < len(waves) else '情報なし'
+                        )
+                        self.content_column.controls.append(forecast_card)
+        except Exception as e:
+            print(f"天気予報表示エラー: {e}")
+            self.content_column.controls.append(
+                ft.Text(f"天気予報の表示中にエラーが発生しました: {e}")
+            )
         
         # 更新ボタン
         self.content_column.controls.append(
@@ -178,30 +216,17 @@ class WeatherDetailView(ft.View):
         # 天気予報を再取得
         self._load_weather()
         
-    def _create_forecast_card(self, forecast):
+    def _create_forecast_card(self, time_define, weather_text, wind_text, wave_text):
         """予報カードを作成"""
         
         # 期間情報
-        time_defines = forecast.get('timeDefines', [])
         date_str = "日時不明"
-        if time_defines and len(time_defines) > 0:
+        if time_define:
             try:
-                dt = datetime.fromisoformat(time_defines[0].replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(time_define.replace('Z', '+00:00'))
                 date_str = dt.strftime('%m月%d日 %H:%M')
             except:
-                date_str = time_defines[0]
-        
-        # 天気情報
-        weathers = forecast.get('weathers', ['情報なし'])
-        weather_text = weathers[0] if weathers else '情報なし'
-        
-        # 風情報
-        winds = forecast.get('winds', ['情報なし'])
-        wind_text = winds[0] if winds else '情報なし'
-        
-        # 波情報
-        waves = forecast.get('waves', ['情報なし'])
-        wave_text = waves[0] if waves else '情報なし'
+                date_str = time_define
         
         # カードを作成
         card = ft.Card(
