@@ -10,11 +10,18 @@ class WeatherApp:
         self.page.window.width = 600
         self.page.window.height = 800
         
+        # 爽やかな青空テーマを設定
+        self.page.theme = ft.Theme(
+            color_scheme_seed=ft.Colors.BLUE,
+            use_material3=True,
+        )
+        self.page.bgcolor = "#F5F5F5"  # ライトグレー背景
+        
         # 最初は地域選択画面を表示
         self.show_area_selection()
     
     def show_area_selection(self):
-        print(" 地域選択画面を表示")
+        print("📍 地域選択画面を表示")
         
         # 既存のビューをクリア
         self.page.views.clear()
@@ -26,7 +33,18 @@ class WeatherApp:
         )
         
         # ビューを追加
-        self.page.views.append(area_view)
+        main_view = ft.View(
+            route="/",
+            controls=[
+                ft.Container(
+                    content=area_view,
+                    expand=True,
+                ),
+            ],
+        )
+        
+        # ビューを追加
+        self.page.views.append(main_view)
         self.page.update()
     
     def show_weather_detail(self, area_code: str):
@@ -40,7 +58,18 @@ class WeatherApp:
         )
         
         # ビューを追加
-        self.page.views.append(weather_view)
+        main_view = ft.View(
+            route=f"/weather/{area_code}",
+            controls=[
+                ft.Container(
+                    content=weather_view,
+                    expand=True,
+                ),
+            ],
+        )
+        
+        # ビューを追加
+        self.page.views.append(main_view)
         self.page.update()
 
 
@@ -49,4 +78,4 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(main)
