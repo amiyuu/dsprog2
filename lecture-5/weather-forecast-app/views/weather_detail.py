@@ -12,19 +12,19 @@ from services.jma_api import JmaApiService
 from datetime import datetime
 
 
-class WeatherDetailView(ft.View):
+class WeatherDetailView(ft.Column):
     #天気予報詳細画面のクラス
     
     def __init__(self, page: ft.Page,area_code : str, on_back):
         
-        #viewの初期化
+        #Columnの初期化
         super().__init__(
-            route = "/weather_view/{area_code}",
-            controls = []
-            )
+            expand=True,
+            scroll=ft.ScrollMode.AUTO,
+        )
         
         # ページとコールバックを保存
-        self.page = page
+        self._page = page
         self.area_code = area_code
         self.on_back = on_back
         
@@ -40,47 +40,51 @@ class WeatherDetailView(ft.View):
     def build_ui(self):
         #ui要素を構築
 
-        #タイトルバー
-        title_bar = ft.Row(
-            controls = [
-                ft.IconButton(
-                    icon = ft.Icons.ARROW_BACK,
-                    on_click = lambda e: self.on_back(),
-                    tooltip = "地域選択に戻る",
-                ),
-                ft.Text(
-                    "天気予報",
-                    size = 24,
-                    weight = ft.FontWeight.BOLD
+        #タイトルバー（青のグラデーション背景）
+        title_bar = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.IconButton(
+                        icon=ft.Icons.ARROW_BACK,
+                        on_click=lambda e: self.on_back(),
+                        tooltip="地域選択に戻る",
+                        icon_color=ft.Colors.WHITE,
+                        bgcolor=ft.Colors.BLUE_700,
                     ),
-            ],
-            alignment = ft.MainAxisAlignment.START,
+                    ft.Icon(ft.Icons.CLOUD, color=ft.Colors.WHITE, size=28),
+                    ft.Text(
+                        "天気予報",
+                        size=24,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.WHITE,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            bgcolor=ft.Colors.BLUE,
+            padding=20,
+            border_radius=ft.border_radius.only(bottom_left=15, bottom_right=15),
         )
         
         #コンテンツエリア（ローディング表示）
         self.content_column = ft.Column(
-            controls = [
-                ft.ProgressRing(),
-                ft.Text("天気予報を読み込んでいます..."),
+            controls=[
+                ft.ProgressRing(color=ft.Colors.BLUE),
+                ft.Text("天気予報を読み込んでいます...", color=ft.Colors.BLUE_900),
             ],
-            horizontal_alignment = ft.CrossAxisAlignment.CENTER,
-            spacing = 20,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=20,
+            expand=True,
         )    
     
-        # 全てのコントロールをViewに追加
+        # 全てのコントロールをColumnに追加
         self.controls = [
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        title_bar,
-                        ft.Divider(),
-                        self.content_column,
-                    ],
-                    spacing=20,
-                ),
-                padding=20,
-            )
+            title_bar,
+            ft.Container(height=10),  # スペース
+            self.content_column,
         ]
+        self.spacing = 0
+        self.padding = 0
         
     def _load_weather(self):
         #天気予報データを読み込む
@@ -100,7 +104,7 @@ class WeatherDetailView(ft.View):
                     color=ft.Colors.RED,
                 ),
                 ft.ElevatedButton(
-                    "地域選択に戻る",
+                    content=ft.Text("地域選択に戻る"),
                     icon=ft.Icons.ARROW_BACK,
                     on_click=lambda e: self.on_back(),
                 ),
@@ -159,16 +163,66 @@ class WeatherDetailView(ft.View):
             self._safe_update()
             return
         
-        # timeSeriesから天気予報データを取得
+        # timeSeriesから天気予報データを取得(気温降水量、天気、風、波)
         try:
             first_forecast = self.weather_data[0]
             time_series = first_forecast.get('timeSeries', [])
+            
+            # 降水確率のデータを取得
+            pops = []
+            
+            # 降水確率（timeSeries[1]）
+            if len(time_series) > 1:
+                pop_data = time_series[1].get('areas', [])
+                if pop_data and len(pop_data) > 0:
+                    pops = pop_data[0].get('pops', [])
+            
+            # 気温データを取得（timeSeries[2]）
+            temp_min_max = []  # 最低気温と最高気温のペア
+            
+            if len(time_series) > 2:
+                temp_series = time_series[2]
+                temp_time_defines = temp_series.get('timeDefines', [])
+                temp_areas = temp_series.get('areas', [])
+                
+                if temp_areas and len(temp_areas) > 0:
+                    temps = temp_areas[0].get('temps', [])
+                    
+                    # 気温データは通常、[最低, 最高, 最低, 最高, ...] の順
+                    # 各日の最低気温と最高気温をペアにする
+                    for i in range(0, len(temps), 2):
+                        if i + 1 < len(temps):
+                            min_temp = temps[i] if temps[i] != '' else None
+                            max_temp = temps[i + 1] if temps[i + 1] != '' else None
+                            
+                            # 両方のデータがある場合
+                            if min_temp and max_temp:
+                                # 最低と最高が同じ場合（お昼以降など）
+                                if min_temp == max_temp:
+                                    temp_min_max.append(f"最高: {max_temp}℃")
+                                else:
+                                    temp_min_max.append(f"{min_temp}℃ / {max_temp}℃")
+                            # 最高気温のみの場合
+                            elif max_temp and not min_temp:
+                                temp_min_max.append(f"最高: {max_temp}℃")
+                            # 最低気温のみの場合
+                            elif min_temp and not max_temp:
+                                temp_min_max.append(f"最低: {min_temp}℃")
+                            # 両方ともない場合
+                            else:
+                                temp_min_max.append("気温情報なし")
+                        elif i < len(temps):
+                            # 1つだけの場合
+                            if temps[i] != '':
+                                temp_min_max.append(f"{temps[i]}℃")
+                            else:
+                                temp_min_max.append("気温情報なし")
             
             if time_series and len(time_series) > 0:
                 # 最初のtimeSeriesから天気情報を取得
                 ts_data = time_series[0]
                 time_defines = ts_data.get('timeDefines', [])
-                areas = ts_data.get('areas', [])
+                areas = ts_data.get('areas', []) 
                 
                 if areas and len(areas) > 0:
                     area_data = areas[0]
@@ -182,9 +236,12 @@ class WeatherDetailView(ft.View):
                             time_defines[i] if i < len(time_defines) else None,
                             weathers[i] if i < len(weathers) else '情報なし',
                             winds[i] if i < len(winds) else '情報なし',
-                            waves[i] if i < len(waves) else '情報なし'
+                            waves[i] if i < len(waves) else '情報なし',
+                            temp_min_max[i] if i < len(temp_min_max) else '情報なし',
+                            pops[i] if i < len(pops) else '情報なし'
                         )
                         self.content_column.controls.append(forecast_card)
+                
         except Exception as e:
             print(f"天気予報表示エラー: {e}")
             self.content_column.controls.append(
@@ -194,7 +251,7 @@ class WeatherDetailView(ft.View):
         # 更新ボタン
         self.content_column.controls.append(
             ft.ElevatedButton(
-                "天気予報を更新",
+                content=ft.Text("天気予報を更新"),
                 icon=ft.Icons.REFRESH,
                 on_click=self._on_refresh_clicked, 
             )
@@ -216,8 +273,8 @@ class WeatherDetailView(ft.View):
         # 天気予報を再取得
         self._load_weather()
         
-    def _create_forecast_card(self, time_define, weather_text, wind_text, wave_text):
-        """予報カードを作成"""
+    def _create_forecast_card(self, time_define, weather_text, wind_text, wave_text, temp_text, pop_text):
+        """予報カードを作成（ExpansionTileで詳細表示）"""
         
         # 期間情報
         date_str = "日時不明"
@@ -228,39 +285,102 @@ class WeatherDetailView(ft.View):
             except:
                 date_str = time_define
         
-        # カードを作成
-        card = ft.Card(
-            content=ft.Container(
-                content=ft.Column(
+        # 天気アイコンと色を選択
+        weather_icon = ft.Icons.WB_SUNNY
+        icon_color = ft.Colors.ORANGE  # デフォルトは晴れ（オレンジ）
+        
+        if "雨" in weather_text or "雷" in weather_text:
+            weather_icon = ft.Icons.WATER_DROP
+            icon_color = ft.Colors.BLUE  # 雨は青
+        elif "曇" in weather_text:
+            weather_icon = ft.Icons.CLOUD
+            icon_color = ft.Colors.GREY  # 曇りはグレー
+        elif "雪" in weather_text:
+            weather_icon = ft.Icons.AC_UNIT
+            icon_color = ft.Colors.CYAN  # 雪はシアン（水色）
+        elif "晴" in weather_text:
+            weather_icon = ft.Icons.WB_SUNNY
+            icon_color = ft.Colors.ORANGE  # 晴れはオレンジ
+        else:
+            weather_icon = ft.Icons.HELP_OUTLINE
+            icon_color = ft.Colors.GREY  # その他はグレー
+        
+        # 基本情報（常に表示）
+        summary_row = ft.Row(
+            controls=[
+                ft.Icon(weather_icon, size=32, color=icon_color),
+                ft.Column(
                     controls=[
                         ft.Text(
-                            date_str,
+                            weather_text,
                             size=16,
                             weight=ft.FontWeight.BOLD,
                         ),
-                        ft.Divider(height=1),
-                        ft.Row(
-                            controls=[
-                                ft.Icon(ft.Icons.WB_SUNNY, size=20),
-                                ft.Text(f"天気: {weather_text}"),
-                            ],
-                        ),
-                        ft.Row(
-                            controls=[
-                                ft.Icon(ft.Icons.AIR, size=20),
-                                ft.Text(f"風: {wind_text}"),
-                            ],
-                        ),
-                        ft.Row(
-                            controls=[
-                                ft.Icon(ft.Icons.WAVES, size=20),
-                                ft.Text(f"波: {wave_text}"),
-                            ],
+                        ft.Text(
+                            f"気温: {temp_text} | 降水確率: {pop_text}%",
+                            size=12,
+                            color=ft.Colors.GREY_700,
                         ),
                     ],
-                    spacing=10,
+                    spacing=2,
                 ),
-                padding=15,
+            ],
+            spacing=15,
+        )
+        
+        # 詳細情報（展開時に表示）
+        detail_controls = [
+            ft.Divider(height=1),
+            ft.ListTile(
+                leading=ft.Icon(ft.Icons.THERMOSTAT, size=20, color=ft.Colors.RED),
+                title=ft.Text("気温（最低 / 最高）"),
+                subtitle=ft.Text(f"{temp_text}"),
+                dense=True,
+            ),
+            ft.ListTile(
+                leading=ft.Icon(ft.Icons.WATER_DROP, size=20, color=ft.Colors.BLUE),
+                title=ft.Text("降水確率"),
+                subtitle=ft.Text(f"{pop_text}%"),
+                dense=True,
+            ),
+            ft.ListTile(
+                leading=ft.Icon(ft.Icons.AIR, size=20, color=ft.Colors.GREEN),
+                title=ft.Text("風"),
+                subtitle=ft.Text(wind_text),
+                dense=True,
+            ),
+            ft.ListTile(
+                leading=ft.Icon(ft.Icons.WAVES, size=20, color=ft.Colors.CYAN),
+                title=ft.Text("波"),
+                subtitle=ft.Text(wave_text),
+                dense=True,
+            ),
+        ]
+        
+        # ExpansionTileを作成（青のアクセント）
+        expansion_tile = ft.ExpansionTile(
+            title=ft.Text(
+                date_str,
+                size=14,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.BLUE_900,
+            ),
+            subtitle=summary_row,
+            controls=detail_controls,
+        )
+        
+        # カードでラップ（白背景、影付き）
+        card = ft.Container(
+            content=expansion_tile,
+            bgcolor=ft.Colors.WHITE,
+            border_radius=12,
+            padding=10,
+            margin=ft.margin.only(bottom=10, left=10, right=10),
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=5,
+                color=ft.Colors.with_opacity(0.1, ft.Colors.BLUE),
+                offset=ft.Offset(0, 2),
             ),
         )
         
@@ -269,8 +389,8 @@ class WeatherDetailView(ft.View):
     def _safe_update(self):
         """安全にページを更新"""
         try:
-            if self.page:
-                self.page.update()
+            if self._page:
+                self._page.update()
             else:
                 self.update()
         except Exception as e:
@@ -296,4 +416,4 @@ if __name__ == "__main__":
         page.update()
     
     # アプリを起動
-    ft.app(target=main)
+    ft.run(target=main)
