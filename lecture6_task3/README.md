@@ -28,8 +28,9 @@
 - `weather`: 天気
 - `area_id`: 外部キー（area.idを参照）
 
-### ファイル構造
+## ファイル構造
 
+```
 lecture6_task3/
 ├── weather-forecast-app/
 │   ├── main.py                    # アプリケーションのエントリーポイント
@@ -41,7 +42,8 @@ lecture6_task3/
 │   │   └── weather_detail.py     # 天気詳細画面
 │   └── weather.db                # SQLiteDB
 ├── auto_update.py                # 全地域自動更新スクリプト
-└── README.md                     
+└── README.md
+```                     
 
 ### 操作方法
 1. 地域リストから見たい地域をクリック
