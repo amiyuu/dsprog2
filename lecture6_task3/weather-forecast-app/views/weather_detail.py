@@ -9,6 +9,7 @@ if __name__ == "__main__":
     
 import flet as ft
 from services.jma_api import JmaApiService
+from services.db_service import DatabaseService
 from datetime import datetime
 
 
@@ -30,6 +31,12 @@ class WeatherDetailView(ft.Column):
         
         #天気予報データ
         self.weather_data = None
+        
+        # データベースサービス
+        self.db_service = DatabaseService(db_path='../weather.db')
+        
+        # 現在のタブ（0: 現在の予報, 1: 過去の履歴）
+        self.current_tab = 0
         
         #ui要素
         self.build_ui()
@@ -66,6 +73,41 @@ class WeatherDetailView(ft.Column):
             border_radius=ft.border_radius.only(bottom_left=15, bottom_right=15),
         )
         
+        # タブボタン
+        self.tab_buttons = ft.Row(
+            controls=[
+                ft.Container(
+                    content=ft.Text(
+                        "現在の予報",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.WHITE,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    bgcolor=ft.Colors.BLUE,
+                    padding=ft.padding.symmetric(horizontal=20, vertical=10),
+                    border_radius=ft.border_radius.only(top_left=10, top_right=10),
+                    on_click=lambda e: self._switch_tab(0),
+                    expand=True,
+                ),
+                ft.Container(
+                    content=ft.Text(
+                        "過去の履歴",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.BLUE_700,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    bgcolor=ft.Colors.BLUE_100,
+                    padding=ft.padding.symmetric(horizontal=20, vertical=10),
+                    border_radius=ft.border_radius.only(top_left=10, top_right=10),
+                    on_click=lambda e: self._switch_tab(1),
+                    expand=True,
+                ),
+            ],
+            spacing=5,
+        )
+        
         #コンテンツエリア（ローディング表示）
         self.content_column = ft.Column(
             controls=[
@@ -81,10 +123,196 @@ class WeatherDetailView(ft.Column):
         self.controls = [
             title_bar,
             ft.Container(height=10),  # スペース
+            ft.Container(
+                content=self.tab_buttons,
+                padding=ft.padding.symmetric(horizontal=10),
+            ),
             self.content_column,
         ]
         self.spacing = 0
         self.padding = 0
+    
+    def _switch_tab(self, tab_index):
+        """タブを切り替える"""
+        self.current_tab = tab_index
+        
+        # タブボタンの見た目を更新
+        for i, container in enumerate(self.tab_buttons.controls):
+            if i == tab_index:
+                # アクティブなタブ
+                container.bgcolor = ft.Colors.BLUE
+                container.content.color = ft.Colors.WHITE
+            else:
+                # 非アクティブなタブ
+                container.bgcolor = ft.Colors.BLUE_100
+                container.content.color = ft.Colors.BLUE_700
+        
+        # コンテンツを切り替え
+        if tab_index == 0:
+            # 現在の予報を表示
+            if self.weather_data:
+                self._display_weather()
+            else:
+                self._load_weather()
+        else:
+            # 過去の履歴を表示
+            self._display_history()
+        
+        self._safe_update()
+    
+    def _display_history(self):
+        """過去の天気情報を表示"""
+        self.content_column.controls.clear()
+        
+        # ローディング表示
+        self.content_column.controls.append(
+            ft.ProgressRing(color=ft.Colors.BLUE)
+        )
+        self.content_column.controls.append(
+            ft.Text("履歴を読み込んでいます...", color=ft.Colors.BLUE_900)
+        )
+        self._safe_update()
+        
+        # データベースから履歴を取得
+        history = self.db_service.get_weather_history(area_id=self.area_code, limit=50)
+        
+        self.content_column.controls.clear()
+        
+        if not history or len(history) == 0:
+            self.content_column.controls.append(
+                ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Icon(ft.Icons.HISTORY, size=64, color=ft.Colors.GREY),
+                            ft.Text(
+                                "この地域の履歴データがありません",
+                                size=16,
+                                color=ft.Colors.GREY_700,
+                            ),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=10,
+                    ),
+                    padding=50,
+                )
+            )
+        else:
+            # 履歴データを表示
+            self.content_column.controls.append(
+                ft.Text(
+                    f"過去の天気情報 ({len(history)}件)",
+                    size=18,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.BLUE_900,
+                )
+            )
+            self.content_column.controls.append(ft.Divider())
+            
+            # 各履歴データをカードで表示
+            for record in history:
+                # record: (id, area_name, time, weather, min_temperature, max_temperature, wind, wave, rain_proba)
+                history_card = self._create_history_card(
+                    time_str=record[2],
+                    weather=record[3],
+                    min_temperature=record[4],
+                    max_temperature=record[5],
+                    wind=record[6],
+                    wave=record[7],
+                    rain_proba=record[8],
+                )
+                self.content_column.controls.append(history_card)
+        
+        self._safe_update()
+    
+    def _create_history_card(self, time_str, weather, min_temperature, max_temperature, wind, wave, rain_proba):
+        """履歴カードを作成"""
+        # 日時をフォーマット
+        try:
+            dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+            date_str = dt.strftime('%Y年%m月%d日 %H:%M')
+        except:
+            date_str = time_str
+        
+        # 天気アイコンと色を選択
+        weather_icon = ft.Icons.WB_SUNNY
+        icon_color = ft.Colors.ORANGE
+        
+        if "雨" in weather or "雷" in weather:
+            weather_icon = ft.Icons.WATER_DROP
+            icon_color = ft.Colors.BLUE
+        elif "曇" in weather:
+            weather_icon = ft.Icons.CLOUD
+            icon_color = ft.Colors.GREY
+        elif "雪" in weather:
+            weather_icon = ft.Icons.AC_UNIT
+            icon_color = ft.Colors.CYAN
+        elif "晴" in weather:
+            weather_icon = ft.Icons.WB_SUNNY
+            icon_color = ft.Colors.ORANGE
+        
+        # 気温表示
+        if min_temperature is not None and max_temperature is not None:
+            if min_temperature == max_temperature:
+                temp_text = f"{max_temperature}℃"
+            else:
+                temp_text = f"{min_temperature}℃ / {max_temperature}℃"
+        elif max_temperature is not None:
+            temp_text = f"最高 {max_temperature}℃"
+        elif min_temperature is not None:
+            temp_text = f"最低 {min_temperature}℃"
+        else:
+            temp_text = "データなし"
+        
+        # 降水確率表示
+        rain_text = f"{rain_proba}%" if rain_proba else "-"
+        
+        # カード作成
+        card = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(weather_icon, size=40, color=icon_color),
+                    ft.Column(
+                        controls=[
+                            ft.Text(
+                                date_str,
+                                size=12,
+                                color=ft.Colors.GREY_700,
+                            ),
+                            ft.Text(
+                                weather,
+                                size=14,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                            ft.Row(
+                                controls=[
+                                    ft.Icon(ft.Icons.THERMOSTAT, size=16, color=ft.Colors.RED),
+                                    ft.Text(temp_text, size=12),
+                                    ft.Container(width=10),
+                                    ft.Icon(ft.Icons.WATER_DROP, size=16, color=ft.Colors.BLUE),
+                                    ft.Text(rain_text, size=12),
+                                ],
+                                spacing=5,
+                            ),
+                        ],
+                        spacing=2,
+                        expand=True,
+                    ),
+                ],
+                spacing=15,
+            ),
+            bgcolor=ft.Colors.WHITE,
+            border_radius=10,
+            padding=15,
+            margin=ft.margin.only(bottom=10, left=10, right=10),
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=3,
+                color=ft.Colors.with_opacity(0.1, ft.Colors.BLUE),
+                offset=ft.Offset(0, 2),
+            ),
+        )
+        
+        return card
         
     def _load_weather(self):
         #天気予報データを読み込む
@@ -93,6 +321,35 @@ class WeatherDetailView(ft.Column):
         
         if self.weather_data:
             print(" 天気予報取得成功")
+            
+            # データベースに保存
+            try:
+                # エリア名を取得
+                area_name = "不明な地域"
+                if self.weather_data and len(self.weather_data) > 0:
+                    time_series = self.weather_data[0].get('timeSeries', [])
+                    if time_series and len(time_series) > 0:
+                        areas = time_series[0].get('areas', [])
+                        if areas and len(areas) > 0:
+                            area_name = areas[0].get('area', {}).get('name', area_name)
+                
+                # エリアをDBに登録
+                area_db_id = self.db_service.insert_area(area_name, self.area_code)
+                
+                if area_db_id:
+                    # 天気情報をDBに保存
+                    saved_count = self.db_service.insert_or_update_weather_data(
+                        area_db_id, 
+                        self.weather_data
+                    )
+                    print(f"💾 データベースに{saved_count}件保存しました")
+                else:
+                    print("⚠️ エリアの登録に失敗しました")
+                    
+            except Exception as e:
+                print(f"⚠️ データベース保存エラー: {e}")
+            
+            # 画面に表示
             self._display_weather()
         else:
             print("❌ 天気予報取得失敗")
@@ -104,7 +361,7 @@ class WeatherDetailView(ft.Column):
                     color=ft.Colors.RED,
                 ),
                 ft.ElevatedButton(
-                    content=ft.Text("地域選択に戻る"),
+                    text="地域選択に戻る",
                     icon=ft.Icons.ARROW_BACK,
                     on_click=lambda e: self.on_back(),
                 ),
@@ -251,7 +508,7 @@ class WeatherDetailView(ft.Column):
         # 更新ボタン
         self.content_column.controls.append(
             ft.ElevatedButton(
-                content=ft.Text("天気予報を更新"),
+                text="天気予報を更新",
                 icon=ft.Icons.REFRESH,
                 on_click=self._on_refresh_clicked, 
             )
