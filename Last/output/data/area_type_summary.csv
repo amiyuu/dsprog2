@@ -1,0 +1,8 @@
+﻿,city_name,vacant_rate,vacant_rate,vacant_rate,vacant_rate,old_house_rate,old_house_rate,second_use_rate,second_use_rate
+,count,mean,std,min,max,mean,std,mean,std
+area_type,,,,,,,,,
+両方の問題あり,5,18.48,3.58,13.82,22.05,27.5,6.03,4.84,1.57
+別荘問題,2,17.14,1.49,16.09,18.2,17.14,0.7,7.38,3.03
+別荘地（特別対策必要）,1,46.06,,46.06,46.06,23.3,,68.48,
+比較的良好,5,14.81,2.75,12.2,19.47,15.65,3.32,1.66,0.76
+築年数問題,2,17.79,0.49,17.44,18.14,24.38,6.18,1.76,0.58
