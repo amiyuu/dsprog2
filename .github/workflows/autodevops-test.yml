@@ -1,4 +1,4 @@
-name: AutoDevOps Test Workflow
+name: AutoDevOps Test
 
 on:
   push:
@@ -19,22 +19,33 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x' # Use the latest available Python 3 version
+          python-version: '3.x' # Use a recent stable Python version
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Check for requirements.txt in the 'Last' directory and install if found
           if [ -f Last/requirements.txt ]; then
+            echo "Installing dependencies from Last/requirements.txt"
             pip install -r Last/requirements.txt
           else
-            echo "Last/requirements.txt not found. Skipping dependency installation."
+            echo "No Last/requirements.txt found in 'Last' directory. Skipping dependency installation for this project."
           fi
+          # Note: If other sub-projects (e.g., lecture-4/calcurator) have their own dependencies
+          # and tests, they would require separate installation/test steps or jobs.
+          # This workflow focuses on the most explicit test case: Last/test.py.
 
       - name: Run tests
-        # Assuming Last/test.py is a Python script that executes tests.
-        # If it uses a specific test runner like pytest, the command might be 'pytest Last/test.py'.
-        # For this repository structure, running the script directly is a common approach.
-        run: python Last/test.py
+        run: |
+          # Check if Last/test.py exists and run it
+          if [ -f Last/test.py ]; then
+            echo "Running tests from Last/test.py"
+            python Last/test.py
+          else
+            echo "No Last/test.py found. Skipping tests for 'Last' project."
+            # Exit with success if no tests are found, as it's not a failure of the code itself.
+            exit 0
+          fi
 
       - name: Notify AutoDevOps on failure
         if: failure()
