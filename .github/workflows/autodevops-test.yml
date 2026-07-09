@@ -19,15 +19,30 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Pythonのバージョンはプロジェクトに合わせて調整してください
+          python-version: '3.x' # Use a recent stable Python version
 
-      - name: Install dependencies for Last/
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r Last/requirements.txt
+          # Check if requirements.txt exists in the Last/ directory
+          if [ -f Last/requirements.txt ]; then
+            echo "Installing dependencies from Last/requirements.txt"
+            pip install -r Last/requirements.txt
+          else
+            echo "Last/requirements.txt not found. Skipping dependency installation."
+          fi
 
-      - name: Run tests for Last/
-        run: python Last/test.py
+      - name: Run tests
+        run: |
+          # Check if test.py exists in the Last/ directory
+          if [ -f Last/test.py ]; then
+            echo "Running tests from Last/test.py"
+            python Last/test.py
+          else
+            echo "Last/test.py not found. No primary test file to execute."
+            # If no test file is found, the job should fail as it implies no tests were run.
+            exit 1
+          fi
 
       - name: Notify AutoDevOps on failure
         if: failure()
