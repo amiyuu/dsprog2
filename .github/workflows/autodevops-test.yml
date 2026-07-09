@@ -1,4 +1,4 @@
-name: AutoDevOps Test
+name: AutoDevOps Test Workflow
 
 on:
   push:
@@ -17,17 +17,29 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x' # Use a recent stable Python 3 version
+          python-version: '3.10' # 推論されたPythonプロジェクトに合わせてバージョンを設定
 
-      - name: Install dependencies for Last/
+      - name: Install dependencies for Last/ project
+        # Last/requirements.txt が存在する場合に依存関係をインストール
         run: |
-          python -m pip install --upgrade pip
-          pip install -r Last/requirements.txt
+          if [ -f Last/requirements.txt ]; then
+            python -m pip install --upgrade pip
+            pip install -r Last/requirements.txt
+          else
+            echo "Last/requirements.txt が見つかりませんでした。Last/ プロジェクトの依存関係のインストールをスキップします。"
+          fi
 
-      - name: Run tests in Last/
-        run: python Last/test.py
+      - name: Run tests for Last/ project
+        # Last/test.py が存在する場合にテストを実行
+        run: |
+          if [ -f Last/test.py ]; then
+            python Last/test.py
+          else
+            echo "Last/test.py が見つかりませんでした。Last/ プロジェクトのテスト実行をスキップします。"
+            exit 1 # 主要なテストファイルが見つからない場合はジョブを失敗させる
+          fi
 
       - name: Notify AutoDevOps on failure
         if: failure()
