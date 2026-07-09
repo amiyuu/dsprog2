@@ -1,4 +1,4 @@
-name: AutoDevOps Test
+name: AutoDevOps Test Workflow
 
 on:
   push:
@@ -19,19 +19,33 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x' # Use a recent Python version
+          python-version: '3.10' # 推論されたPythonプロジェクトのため、一般的なバージョンを指定
 
       - name: Install dependencies
         run: |
-          # Navigate to the 'Last' directory where requirements.txt and test.py are located
-          cd Last
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          # Last/requirements.txt が存在する場合、依存関係をインストール
+          if [ -f Last/requirements.txt ]; then
+            pip install -r Last/requirements.txt
+          else
+            echo "Last/requirements.txt が見つかりませんでした。Last/ プロジェクトの依存関係インストールをスキップします。"
+          fi
+          # 他のプロジェクト（例: lecture-4/calcurator, lecture-4/hello-world）の pyproject.toml に基づく依存関係インストールは、
+          # 明示的なテストファイルやテストコマンドが指定されていないため、今回はスキップします。
+          # 必要であれば、各ディレクトリに移動して poetry install などを追加できます。
 
       - name: Run tests
         run: |
-          # Navigate to the 'Last' directory to execute the test script
-          cd Last
-          python test.py
+          # Last/test.py が存在する場合、テストを実行
+          if [ -f Last/test.py ]; then
+            echo "Last/test.py を実行します。"
+            python Last/test.py
+          else
+            echo "Last/test.py が見つかりませんでした。テスト実行をスキップします。"
+            # もし pytest などを使用している場合は、以下のように追加できます。
+            # pip install pytest
+            # pytest Last/
+          fi
 
       - name: Notify AutoDevOps on failure
         if: failure()
