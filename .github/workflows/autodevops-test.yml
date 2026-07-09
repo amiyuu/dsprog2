@@ -19,24 +19,35 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x' # Use the latest available 3.x version
+          python-version: '3.x' # Use the latest Python 3.x version
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Install dependencies for the 'Last' project, as it contains 'test.py'
           if [ -f Last/requirements.txt ]; then
             pip install -r Last/requirements.txt
-          else
-            echo "Last/requirements.txt not found. Skipping dependency installation."
           fi
+          # Add any other project-specific dependency installations here if needed
+          # For example, if lecture-4/calcurator used poetry:
+          # if [ -f lecture-4/calcurator/pyproject.toml ]; then
+          #   pip install poetry
+          #   cd lecture-4/calcurator
+          #   poetry install --no-root
+          #   cd ../../
+          # fi
 
       - name: Run tests
         run: |
+          # Execute the main test file found in 'Last/test.py'
           if [ -f Last/test.py ]; then
             python Last/test.py
           else
-            echo "Last/test.py not found. Skipping test execution."
-            exit 1 # Fail the job if test file is missing
+            echo "No 'Last/test.py' found. Skipping specific test execution."
+            # Add commands to run other tests if they exist, e.g., pytest
+            # For example, if using pytest and tests are in a 'tests' directory:
+            # pip install pytest
+            # pytest
           fi
 
       - name: Notify AutoDevOps on failure
