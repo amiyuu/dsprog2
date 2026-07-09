@@ -1,4 +1,4 @@
-name: AutoDevOps Test Workflow
+name: AutoDevOps Test
 
 on:
   push:
@@ -13,45 +13,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x' # Use the latest stable Python 3 version
-        cache: 'pip' # Cache pip dependencies for faster builds
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x' # Use a recent Python version
 
-    - name: Install dependencies
-      # Check if requirements.txt exists in the 'Last/' directory and install if it does.
-      # This assumes 'Last/' is the primary project for this test workflow.
-      run: |
-        if [ -f Last/requirements.txt ]; then
-          echo "Installing dependencies from Last/requirements.txt..."
-          pip install -r Last/requirements.txt
-        else
-          echo "Last/requirements.txt not found. Skipping dependency installation via requirements.txt."
-        fi
-      # For other Python projects (e.g., those with pyproject.toml in lecture-4/),
-      # a more complex setup (e.g., matrix strategy or separate jobs) would be needed
-      # if they also required testing within this single workflow.
-      # Given 'Last/test.py' is the explicit test file, we focus on its dependencies.
+      - name: Install dependencies
+        run: |
+          # Navigate to the 'Last' directory where requirements.txt and test.py are located
+          cd Last
+          pip install -r requirements.txt
 
-    - name: Run tests
-      # Execute the primary test file found in the 'Last/' directory.
-      # If 'Last/test.py' uses a test runner like pytest, the command would be 'pytest Last/test.py'.
-      # Assuming it's a standard Python script for now.
-      run: python Last/test.py
+      - name: Run tests
+        run: |
+          # Navigate to the 'Last' directory to execute the test script
+          cd Last
+          python test.py
 
-    - name: Notify AutoDevOps on failure
-      if: failure()
-      run: |
-        BRANCH="${{ github.head_ref || github.ref_name }}"
-        COMMIT_MSG="${{ github.event.head_commit.message }}"
-        if [[ "$BRANCH" == fix/agent-* ]] || echo "$COMMIT_MSG" | grep -qE "\[Auto-Fix\]|fix: AutoDevOps Agent|docs: Add incident|fix: Self-Healing Agent"; then
-          echo "Skipping AutoDevOps notification for auto-fix branch or commit."
-          exit 0
-        fi
-        curl -s -X POST -H "Content-Type: application/json" \
-        -d "{\"workflow_run\": {\"name\": \"${{ github.workflow }}\", \"head_branch\": \"$BRANCH\", \"updated_at\": \"${{ github.event.head_commit.timestamp }}\"}, \"repository\": {\"full_name\": \"${{ github.repository }}\"}, \"action\": \"completed\", \"conclusion\": \"failure\"}" \
-        "https://autodevops-merge-worker-617819190113.asia-northeast1.run.app/webhook/github_actions?user_id=mseGHtj9GAQ8cDIk9UvirQfFpQt1"
+      - name: Notify AutoDevOps on failure
+        if: failure()
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          if [[ "$BRANCH" == fix/agent-* ]] || echo "$COMMIT_MSG" | grep -qE "\[Auto-Fix\]|fix: AutoDevOps Agent|docs: Add incident|fix: Self-Healing Agent"; then
+            echo "Skipping AutoDevOps notification for auto-fix branch or commit."
+            exit 0
+          fi
+          curl -s -X POST -H "Content-Type: application/json" \
+          -d "{\"workflow_run\": {\"name\": \"${{ github.workflow }}\", \"head_branch\": \"$BRANCH\", \"updated_at\": \"${{ github.event.head_commit.timestamp }}\"}, \"repository\": {\"full_name\": \"${{ github.repository }}\"}, \"action\": \"completed\", \"conclusion\": \"failure\"}" \
+          "https://autodevops-merge-worker-617819190113.asia-northeast1.run.app/webhook/github_actions?user_id=mseGHtj9GAQ8cDIk9UvirQfFpQt1"
