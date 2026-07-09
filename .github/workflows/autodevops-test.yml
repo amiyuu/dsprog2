@@ -19,29 +19,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x' # Use the latest stable Python 3 version
+          python-version: '3.x' # Use a recent stable Python version
 
-      - name: Install dependencies
+      - name: Install dependencies for Last project
         run: |
           python -m pip install --upgrade pip
-          # Check if Last/requirements.txt exists and install dependencies
-          if [ -f Last/requirements.txt ]; then
-            pip install -r Last/requirements.txt
-          else
-            echo "Last/requirements.txt not found. Skipping dependency installation for Last/."
-          fi
+          pip install -r Last/requirements.txt
 
-      - name: Run tests
-        run: |
-          # Check if Last/test.py exists and run tests
-          if [ -f Last/test.py ]; then
-            python Last/test.py
-          else
-            echo "Last/test.py not found. Skipping tests."
-            # If no test file is found, consider this step successful as no tests could be run.
-            # If you want this to fail, change 'exit 0' to 'exit 1'.
-            exit 0
-          fi
+      - name: Run tests for Last project
+        run: python Last/test.py
 
       - name: Notify AutoDevOps on failure
         if: failure()
